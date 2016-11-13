@@ -10,7 +10,8 @@
             if(args.length === 0) return [];
             var array = [];
             var index = isUndefined(startIndex) ? 0 : startIndex;
-            for(var x = index; x < args.length; x++) {
+            var argsLength = args.length;
+            for(var x = index; x < argsLength; x++) {
                 array.push(args[x]);
             }
             return array;
