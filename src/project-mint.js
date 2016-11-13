@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    var utils = (function() {
+    var $utils = (function() {
         function _isType(obj, type) {
             return typeof obj === type;
         };
@@ -67,8 +67,13 @@
         };
 
         function bind(context, fn) {
+            var args = _args(arguments, 2);
             return function() {
-              return fn.apply(context, arguments);
+                var index = arguments.length;
+                while(index--) {
+                    args.push(arguments[index]);
+                }
+                return fn.apply(context, args);
             };
         };
 
@@ -78,14 +83,22 @@
                 _loop(source, iterator);
             }
             else if(isObject(source)) {
-                _loop(Object.keys(source), function(key) {
+                _loop(Object.getOwnPropertyNames(source), function(key) {
                     iterator(source[key], key);
                 });
             }
         };
 
         function members(obj) {
-          return Object.keys(obj);
+            var result = {
+                properties: [],
+                functions: []
+            };
+            forEach(obj, function(value, key) {
+                result[isFunction(value) ? "functions" : "properties"].push(key);
+            });
+            result.all = [].concat(result.properties, result.functions);
+            return result;
         };
 
         function extend(dest) {
@@ -95,7 +108,9 @@
                 source = _args(arguments);
             }
 
-            if(isArray(source)) {
+            return Object.assign(dest, source);
+
+            /*if(isArray(source)) {
                 forEach(source, function(obj, index) {
                     forEach(obj, function(value, key) {
                         dest[key] = value;
@@ -109,15 +124,15 @@
                 });
                 extend(dest, source.prototype);
             }
-            return dest;
+            return dest;*/
         };
 
         function element(selector) {
-            return new $Element(selector);
+            return new $element(selector);
         };
 
-        var utils = {};
-        extend(utils, {
+        var $utils = {};
+        extend($utils, {
             isArray: isArray,
             isString: isString,
             isNumber: isNumber,
@@ -132,21 +147,21 @@
             bind: bind,
             members: members
         });
-        return utils;
+        return $utils;
     })();
 
-    var $Element = (function() {
+    var $element = (function() {
         var el = undefined;
         
-        function $Element(selector) {
-            el = utils.isString(selector) ? document.querySelectorAll(selector) : selector;
+        function $element(selector) {
+            el = $utils.isString(selector) ? document.querySelectorAll(selector) : selector;
             this.length = el.length;
-            _loop(utils.bind(this, function(item, index) {
+            _loop($utils.bind(this, function(item, index) {
                 this[index] = item;
             }));
         };
 
-        var proto = $Element.prototype;
+        var proto = $element.prototype;
 
         proto.toArray = toArray;
         proto.prop = prop;
@@ -158,7 +173,7 @@
         proto.html = html;
 
         function html(newHtml) {
-            if(utils.isUndefined(newHtml)) {
+            if($utils.isUndefined(newHtml)) {
                 var result = undefined;
                 if(el.length === 1) {
                     result = el[0].outerHTML;
@@ -180,10 +195,10 @@
 
         function clone(deepClone) {
             var clones = [];
-            utils.forEach(el, function(element) {
+            $utils.forEach(el, function(element) {
                 clones.push(element.cloneNode(deepClone));
             });
-            return new $Element(clones);
+            return new $element(clones);
         }
 
         function children() {
@@ -201,7 +216,7 @@
         };
 
         function _loop(iterator) {
-            utils.forEach(el, iterator);
+            $utils.forEach(el, iterator);
         };
 
         function _retrieve(callback) {
@@ -222,7 +237,7 @@
         };
 
         function prop(name, value) {
-            if(utils.isUndefined(value)) {
+            if($utils.isUndefined(value)) {
                 var result = [];
                 _retrieve(function(item) {
                     if(el.length === 1) {
@@ -243,7 +258,7 @@
         };
 
         function attr(name, value) {
-            if(utils.isUndefined(value)) {
+            if($utils.isUndefined(value)) {
                 var result = [];
                 _retrieve(function(item) {
                     if(el.length === 1) {
@@ -275,20 +290,20 @@
             return this;
         };
 
-        return $Element;
+        return $element;
     })();
 
-    var $EventDriven = (function() {
+    var $eventDriven = (function() {
 
         var events = {};
 
         var context = undefined;
 
-        function $EventDriven(ctx) {
+        function $eventDriven(ctx) {
             context = ctx;
         };
 
-        var proto = $EventDriven.prototype;
+        var proto = $eventDriven.prototype;
 
         proto.on = on;
 
@@ -296,7 +311,7 @@
 
         function on(event, callback) {
             var array = undefined;
-            if(utils.isUndefined((array = events[event]))) {
+            if($utils.isUndefined((array = events[event]))) {
                 array = events[event] = [];
             }
             if(array.indexOf(callback) !== -1) return;
@@ -305,12 +320,12 @@
 
         function emit(event, args) {
             if(!(event in events)) console.warn("Event '" + event + "' is not registered");
-            utils.forEach(events[event], function(callback) {
+            $utils.forEach(events[event], function(callback) {
                 callback.call(context, args);
             });
         };
 
-        return $EventDriven;
+        return $eventDriven;
     })();
 
     var MVC = (function() {
@@ -320,7 +335,7 @@
 
         function MVC(component, params) {
 
-            if(utils.isUndefined(this)) {
+            if($utils.isUndefined(this)) {
               new MVC(component, params);
               return;
             }
@@ -351,7 +366,7 @@
 
             this.controller.call(this.model);
 
-            this.connectEvents();
+            this.connectEvents(this.element, this.model);
 
             return;
         };
@@ -370,8 +385,8 @@
             var text = undefined;
             var objModel = (model||this.model);
             var html = "";
-            utils.forEach(this.bindings, function(binding, id) {
-                utils.forEach(binding.expressions, function(expression) {
+            $utils.forEach(this.bindings, function(binding, id) {
+                $utils.forEach(binding.expressions, function(expression) {
                     html += binding.templateHTML.replace(new RegExp(expression), evalInterpolation(objModel, expression.replace(/{{/g, '').replace(/}}/g, '')));
                 });
                 document.getElementById(id).outerHTML = html;
@@ -383,9 +398,9 @@
             var bindings = {};
             var expressions = undefined;
             var counter = 0;
-            utils.forEach(element.children(), function(item) {
+            $utils.forEach(element.children(), function(item) {
                 expressions = getInterpolationExpressions(item.outerHTML);
-                if(utils.isUndefined(expressions)) return;
+                if($utils.isUndefined(expressions)) return;
                 bindings[(item.id = newId(componentName) + "_" + counter++)] = {
                     templateHTML: item.outerHTML,
                     expressions: expressions
@@ -419,25 +434,57 @@
             return matches;
         }
 
-        function connectEvents() {
-            
+        function connectEvents(element, model) {
+            var events = {};
+            var eventNames = [
+                "on-click", "on-dblclick",
+                "on-change", 
+                "on-keyup", "on-keydown", "on-keypress", 
+                "on-mouseenter", "on-mouseover", "on-mousemove", "on-mouseleave", "on-mouseout",
+                "on-mousedown", "on-mouseup"
+            ];
+
+            var changeableElements = ["select", "input", "textarea"];
+
+            var presentEvents = [];
+            $utils.forEach(element.children(), function(item) {
+                $utils.forEach(eventNames, function(event) {
+                    if(item.hasAttribute(event)) {
+                        if(event === "on-change" && changeableElements.indexOf(item.tagName) === -1) {
+                            return;
+                        }
+                        var method = item.getAttribute(event);
+                        attachEvent(item, event, function() {
+                            model[method]();
+                        });
+                    }
+                });
+            });
+
+            return events;
+        };
+
+        function attachEvent(element, event, handler) {
+            element.attachEvent ? 
+                element.attachEvent(event.replace("-", ""), handler) : 
+                element.addEventListener(event.replace("on-", ""), handler, false);
         };
 
         function validateComponentName(component) {
-            if(component === "" || utils.isUndefined(component)) throw "Please specify the name of a MVC component.";
+            if(component === "" || $utils.isUndefined(component)) throw "Please specify the name of a MVC component.";
 
-            var el = utils.element('[mvc="' + component + '"]');
+            var el = $utils.element('[mvc="' + component + '"]');
             if(el.length > 1) throw "Multiple '" + component + "' detected.";
             if(el.length === 0) throw "No '" + component + "' detected.";
         };
 
         function validateParams(params) {
-            if(utils.isUndefined(params)) throw "Parameters are not supplied.";
-            if(!utils.isPresent(params, "model", "view", "controller")) throw "The parameters must have the 'model', 'view', and 'controller' properties present.";
+            if($utils.isUndefined(params)) throw "Parameters are not supplied.";
+            if(!$utils.isPresent(params, "model", "view", "controller")) throw "The parameters must have the 'model', 'view', and 'controller' properties present.";
 
-            if(!utils.isObject(params.model) && !utils.isFunction(params.model)) throw "The model property must either be a function or an object.";
-            if(!utils.isFunction(params.controller)) throw "The controller property must be a function.";
-            if(!utils.isString(params.view)) throw "The view property must be a string.";
+            if(!$utils.isObject(params.model) && !$utils.isFunction(params.model)) throw "The model property must either be a function or an object.";
+            if(!$utils.isFunction(params.controller)) throw "The controller property must be a function.";
+            if(!$utils.isString(params.view)) throw "The view property must be a string.";
         };
 
         function initializeView(params) {
@@ -450,7 +497,7 @@
 
             var id = params.view;
             try {
-                element = utils.element(id);
+                element = $utils.element(id);
                 if(element.length === 0) throw "Cannot find element with id '" + id + "'.";
                 template = element.prop("outerHTML");
             }
@@ -467,7 +514,7 @@
         function initializeModel(params) {
             var model = undefined;
 
-            if(utils.isFunction(params.model)) {
+            if($utils.isFunction(params.model)) {
                 var result = params.model();
                 if(util.isUndefined(result) || !util.isObject(result) || result === null) throw "The function assigned to the model property must return an object";
                 model = result;
@@ -484,8 +531,8 @@
         };
 
         function shadowify(model, ctx) {
-            var shadowModel = new $EventDriven(ctx);
-            utils.forEach(model, function(value, key) {
+            var shadowModel = new $eventDriven(ctx);
+            $utils.forEach(model, function(value, key) {
                shadowModel["_" + key] = value;
                Object.defineProperty(model, key, {
                    enumerable: true,
@@ -509,7 +556,8 @@
         return MVC;
     })();
 
-    MVC = utils.extend(MVC, utils);
+    MVC = $utils.extend(MVC, $utils);
 
     window.MVC = MVC;
 })();
+
